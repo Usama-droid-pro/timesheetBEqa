@@ -53,32 +53,6 @@ const createProject = async (projectData) => {
  */
 const getAllProjects = async () => {
   try {
-    const projects = await Project.find({isDeleted: false}).populate('members', 'name email role isAdmin');
-
-    return projects.map(project => ({
-      id: project._id,
-      name: project.name,
-      description: project.description,
-      status: project.status,
-      members: Array.isArray(project.members)
-        ? project.members.map(m => ({
-            id: m._id,
-            name: m.name,
-            email: m.email,
-            role: m.role,
-            isAdmin: m.isAdmin
-          }))
-        : [],
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt
-    }));
-  } catch (error) {
-    throw error;
-  }
-};
-
-const getProjects = async () => {
-  try {
     const projects = await Project.find().populate('members', 'name email role isAdmin');
 
     return projects.map(project => ({
@@ -111,15 +85,13 @@ const deleteProject = async (projectId) => {
     console.log("IN delete project ")
     console.log(projectId)
     const project = await Project.findById(projectId);
-
     
     if (!project) {
       throw new Error('Project not found');
     }
 
-    project.isDeleted = true;
-    await project.save();
-  
+    // Soft delete
+    await project.deleteOne({_id: projectId});
 
     return ({
       message : "Project deleted successfully",
@@ -210,6 +182,5 @@ module.exports = {
   createProject,
   getAllProjects,
   deleteProject,
-  updateProject,
-  getProjects
+  updateProject
 };
