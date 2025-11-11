@@ -59,32 +59,33 @@ const generateGrandReport = async (startDate, endDate) => {
           as: 'projectInfo'
         }
       },
-      // Add computed field for project name (prioritize project_id lookup over project_name)
+      // Add computed fields for resolved project id and name (prefer lookup values)
       {
         $addFields: {
+          'tasks.resolvedProjectId': {
+            $ifNull: [{ $arrayElemAt: ['$projectInfo._id', 0] }, '$tasks.project_id']
+          },
           'tasks.resolvedProjectName': {
-            $cond: {
-              if: { $ne: [{ $arrayElemAt: ['$projectInfo.name', 0] }, null] },
-              then: { $arrayElemAt: ['$projectInfo.name', 0] },
-              else: '$tasks.project_name'
-            }
+            $ifNull: [{ $arrayElemAt: ['$projectInfo.name', 0] }, '$tasks.project_name']
           }
         }
       },
-      // Group by resolved project name and user role
+      // Group by resolved project id + name and user role
       {
         $group: {
           _id: {
-            project: '$tasks.resolvedProjectName',
+            projectId: '$tasks.resolvedProjectId',
+            projectName: '$tasks.resolvedProjectName',
             role: '$user.role'
           },
           totalHours: { $sum: '$tasks.hours' }
         }
       },
-      // Group by project to aggregate all roles
+      // Group by project id to aggregate all roles and keep project name
       {
         $group: {
-          _id: '$_id.project',
+          _id: '$_id.projectId',
+          projectName: { $first: '$_id.projectName' },
           roles: {
             $push: {
               role: '$_id.role',
@@ -96,16 +97,17 @@ const generateGrandReport = async (startDate, endDate) => {
       },
       // Sort by project name
       {
-        $sort: { '_id': 1 }
+        $sort: { projectName: 1 }
       }
     ];
 
     const projectData = await TaskLog.aggregate(pipeline);
 
-    // Transform data to the required format
+    // Transform data to the required format (grouped by project id)
     const projects = projectData.map(project => {
       const projectObj = {
-        project: project._id,
+        projectId: project._id,
+        projectName: project.projectName || 'Unassigned',
         totalHours: project.totalHours,
         QA: 0,
         DESIGN: 0,
