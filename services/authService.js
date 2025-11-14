@@ -15,9 +15,13 @@ const login = async (email, password) => {
   try {
     // Find user by email (exclude soft deleted)
     const user = await User.findOne({ email: email.toLowerCase() });
-    
+
     if (!user) {
       throw new Error('Invalid email or password');
+    }
+
+    if (!user.active) {
+      throw new Error('User is inactive. Please contact admin.');
     }
     console.log(user)
     console.log(password)
@@ -25,16 +29,16 @@ const login = async (email, password) => {
 
     // Check password
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    
+
     if (!isPasswordValid) {
       throw new Error('Invalid email or password');
     }
 
     // Generate JWT token
     const token = jwt.sign(
-      { 
+      {
         userId: user._id,
-        role: user.role 
+        role: user.role
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
@@ -47,6 +51,10 @@ const login = async (email, password) => {
       email: user.email,
       role: user.role,
       isAdmin: user.isAdmin,
+      profilePic: user.profilePic,
+      phone: user.phone,
+      dob: user.dob,
+      gender: user.gender,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
     };
@@ -66,7 +74,7 @@ const login = async (email, password) => {
 const getCurrentUser = async (userId) => {
   try {
     const user = await User.findById(userId).select('-password');
-    
+
     if (!user || user.isDeleted) {
       throw new Error('User not found');
     }

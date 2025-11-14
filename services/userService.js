@@ -40,9 +40,7 @@ const createUser = async (userData) => {
   }
 };
 
-/**
- * Get all users (exclude soft deleted)
- */
+
 const getAllUsers = async () => {
   try {
     const users = await User.find({ isDeleted: false })
@@ -55,6 +53,10 @@ const getAllUsers = async () => {
       email: user.email,
       role: user.role,
       createdAt: user.createdAt,
+      dob: user.dob,
+      gender: user.gender,
+      profilePic: user.profilePic,
+      active: user?.active,
       updatedAt: user.updatedAt
     }));
   } catch (error) {
@@ -62,20 +64,18 @@ const getAllUsers = async () => {
   }
 };
 
-/**
- * Update user password (Admin only)
- */
+
 const updateUserPassword = async (userId, newPassword) => {
   try {
     const user = await User.findById(userId);
-    
+
     if (!user || user.isDeleted) {
       throw new Error('User not found');
     }
 
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
+
     user.password = hashedPassword;
     await user.save();
 
@@ -91,19 +91,17 @@ const updateUserPassword = async (userId, newPassword) => {
   }
 };
 
-/**
- * Soft delete user (Admin only)
- */
+
 const deleteUser = async (userId) => {
   try {
     const user = await User.findById(userId);
-    
+
     if (!user || user.isDeleted) {
       throw new Error('User not found');
     }
 
     // Soft delete
-    await user.deleteOne({_id: userId});
+    await user.deleteOne({ _id: userId });
 
     return {
       id: user._id,
@@ -117,9 +115,7 @@ const deleteUser = async (userId) => {
   }
 };
 
-/**
- * Search users by name (returns only id, name, and role)
- */
+
 const searchUsersByName = async (searchQuery) => {
   try {
     if (!searchQuery || searchQuery.trim().length === 0) {
@@ -146,10 +142,155 @@ const searchUsersByName = async (searchQuery) => {
   }
 };
 
+const updateUser = async (userId, updates) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user || user.isDeleted) {
+      throw new Error('User not found');
+    }
+
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'profilePic')) {
+      const profilePic = updates.profilePic;
+      if (typeof profilePic === 'string') {
+        user.profilePic = profilePic.trim();
+      }
+    }
+
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+      const name = updates.name;
+      if (typeof name === 'string') {
+        const trimmed = name.trim();
+        if (trimmed.length < 2) {
+          throw new Error('Name must be at least 2 characters long');
+        }
+        user.name = trimmed;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'phone')) {
+      const phone = updates.phone;
+      user.phone = typeof phone === 'string' ? phone.trim() : null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'dob')) {
+      const dob = updates.dob;
+      if (dob === null || dob === '') {
+        user.dob = null;
+      } else {
+        const dateVal = new Date(dob);
+        if (isNaN(dateVal.getTime())) {
+          throw new Error('Invalid date of birth');
+        }
+        user.dob = dateVal;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'gender')) {
+      const gender = updates.gender;
+      if (gender !== null && gender !== undefined) {
+        const allowed = ['Male', 'Female'];
+        if (!allowed.includes(gender)) {
+          throw new Error('Invalid gender');
+        }
+        user.gender = gender;
+      } else {
+        user.gender = null;
+      }
+    }
+
+    const { currentPassword, newPassword, confirmPassword } = updates;
+    if (currentPassword || newPassword || confirmPassword) {
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        throw new Error('Current, new, and confirm password are required');
+      }
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        throw new Error('Current password is incorrect');
+      }
+      if (newPassword.length < 8) {
+        throw new Error('Password must be at least 8 characters long');
+      }
+      if (newPassword !== confirmPassword) {
+        throw new Error('New password and confirm password do not match');
+      }
+      const hashed = await bcrypt.hash(newPassword, 10);
+      user.password = hashed;
+    }
+
+    await user.save();
+
+    console.log("user is ", user)
+
+    return {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      dob: user.dob,
+      gender: user.gender,
+      profilePic: user.profilePic,
+      updatedAt: user.updatedAt
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const updateUserProfilePic = async (userId, imageUrl) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user || user.isDeleted) {
+      throw new Error('User not found');
+    }
+    user.profilePic = imageUrl || null;
+    await user.save();
+    return {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      dob: user.dob,
+      gender: user.gender,
+      profilePic: user.profilePic,
+      updatedAt: user.updatedAt
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+
+const active_deactivateUser = async (userId, activeStatus) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    user.active = activeStatus;
+    await user.save();
+    return {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      active: user.active,
+      updatedAt: user.updatedAt
+    };
+  } catch (error) {
+    throw error;
+  }
+};
 module.exports = {
   createUser,
   getAllUsers,
   updateUserPassword,
   deleteUser,
-  searchUsersByName
+  searchUsersByName,
+  updateUser,
+  updateUserProfilePic,
+  active_deactivateUser
 };
