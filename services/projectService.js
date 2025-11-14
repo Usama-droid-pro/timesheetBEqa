@@ -53,7 +53,7 @@ const createProject = async (projectData) => {
  */
 const getAllProjects = async () => {
   try {
-    const projects = await Project.find({ isDeleted: false }).populate('members', 'name email role isAdmin');
+    const projects = await Project.find({ isDeleted: false }).populate('members', 'name email role isAdmin profilePic');
 
     return projects.map(project => ({
       id: project._id,
