@@ -76,7 +76,7 @@ const connectDB = async () => {
     });
 
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    
+
     // Seed admin user after successful connection (only in non-Vercel environment)
     // if (process.env.VERCEL !== '1') {
     //   await seedAdmin();
@@ -91,7 +91,7 @@ const connectDB = async () => {
 const startServer = async () => {
   try {
     await connectDB();
-    
+
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
