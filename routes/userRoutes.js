@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, param, query } = require('express-validator');
-const { createUser, getAllUsers, updateUserPassword, deleteUser, searchUsersByName } = require('../controllers/userController');
+const { createUser, getAllUsers, updateUserPassword, deleteUser, searchUsersByName, updateUser, setUserActiveStatus } = require('../controllers/userController');
+const { upload } = require('../middlewares/uploadMiddleware');
 const { authMiddleware, adminMiddleware } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
@@ -61,6 +62,34 @@ router.put('/:id/password', [
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')
 ], updateUserPassword);
+
+/**
+ * PUT /api/users/:id
+ * Update user fields (phone, dob, gender) and optionally password
+ */
+router.put('/:id', [
+  authMiddleware,
+  param('id').isMongoId().withMessage('Invalid user ID'),
+  upload.single('image'),
+  body('name').optional().isString().isLength({ min: 2, max: 100 }).withMessage('Name must be at least 2 characters'),
+  body('phone').optional().isString(),
+  body('dob').optional(),
+  body('gender').optional().isIn(['Male', 'Female']).withMessage('Gender must be Male or Female'),
+  body('currentPassword').optional().isString(),
+  body('newPassword').optional().isString().isLength({ min: 8 }).withMessage('New password must be at least 8 characters'),
+  body('confirmPassword').optional().isString()
+], updateUser);
+
+/**
+ * PUT /api/users/:id/active
+ * Activate/deactivate user (Admin only)
+ */
+router.put('/:id/active', [
+  authMiddleware,
+  adminMiddleware,
+  param('id').isMongoId().withMessage('Invalid user ID'),
+  body('active').isBoolean().withMessage('Active must be a boolean')
+], setUserActiveStatus);
 
 /**
  * DELETE /api/users/:id
