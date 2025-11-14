@@ -68,7 +68,8 @@ const getAllProjects = async () => {
           name: m.name,
           email: m.email,
           role: m.role,
-          isAdmin: m.isAdmin
+          isAdmin: m.isAdmin,
+          profilePic : m.profilePic
         }))
         : [],
       createdAt: project.createdAt,
