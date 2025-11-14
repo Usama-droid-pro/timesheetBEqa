@@ -1,5 +1,7 @@
 const UserService = require('../services/userService');
-const { sendSuccess, sendError, sendServerError } = require('../utils/responseHandler');
+const { sendSuccess, sendError, sendServerError, sendForbidden } = require('../utils/responseHandler');
+const { cloudinary } = require('../utils/cloudinary');
+const streamifier = require('streamifier');
 
 /**
  * User Controller
@@ -15,7 +17,7 @@ const createUser = async (req, res) => {
     const { name, email, password, role } = req.body;
 
     const user = await UserService.createUser({ name, email, password, role });
-    
+
     return sendSuccess(res, 'User created successfully', { user }, 201);
   } catch (error) {
     console.error('Create user error:', error);
@@ -30,7 +32,7 @@ const createUser = async (req, res) => {
 const getAllUsers = async (req, res) => {
   try {
     const users = await UserService.getAllUsers();
-    
+
     return sendSuccess(res, 'Users retrieved successfully', { users }, 200);
   } catch (error) {
     console.error('Get users error:', error);
@@ -43,8 +45,6 @@ const getAllUsers = async (req, res) => {
  * Update user password (Admin only)
  */
 const updateUserPassword = async (req, res) => {
-
-  console.log("IN update password ")
   console.log(req.body)
   console.log(req.params)
   try {
@@ -56,7 +56,7 @@ const updateUserPassword = async (req, res) => {
     }
 
     const user = await UserService.updateUserPassword(id, password);
-    
+
     return sendSuccess(res, 'Password updated successfully', { user }, 200);
   } catch (error) {
     console.error('Update password error:', error);
@@ -73,7 +73,7 @@ const deleteUser = async (req, res) => {
     const { id } = req.params;
 
     const user = await UserService.deleteUser(id);
-    
+
     return sendSuccess(res, 'User deleted successfully', { user }, 200);
   } catch (error) {
     console.error('Delete user error:', error);
@@ -81,6 +81,65 @@ const deleteUser = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/users/:id
+ * Update user fields: phone, dob, gender
+ * Optionally update password when currentPassword, newPassword, confirmPassword are provided
+ */
+const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user || (req.user.id.toString() !== id && !req.user.isAdmin)) {
+      return sendForbidden(res, 'You can only update your own profile');
+    }
+
+    const { name, phone, dob, gender, currentPassword, newPassword, confirmPassword } = req.body;
+    const file = req.file;
+
+    // Handle image upload if provided
+    let profilePicUrl = null;
+    if (file) {
+      console.log(file)
+      profilePicUrl = await new Promise((resolve, reject) => {
+        const folder = `users/${id}`;
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder, resource_type: 'image', overwrite: true },
+          (error, result) => {
+            if (error) {
+              console.error('Cloudinary upload error:', error);
+              reject(new Error('Failed to upload image'));
+            } else {
+              resolve(result.secure_url);
+              console.log("Uploaded")
+            }
+          }
+        );
+        streamifier.createReadStream(file.buffer).pipe(uploadStream);
+      });
+    }
+
+    console.log(profilePicUrl)
+
+    const payload = {
+      ...(typeof name !== 'undefined' ? { name } : {}),
+      ...(typeof phone !== 'undefined' ? { phone } : {}),
+      ...(typeof dob !== 'undefined' ? { dob } : {}),
+      ...(typeof gender !== 'undefined' ? { gender } : {}),
+      ...(profilePicUrl ? { profilePic: profilePicUrl } : {}),
+      ...(currentPassword || newPassword || confirmPassword
+        ? { currentPassword, newPassword, confirmPassword }
+        : {})
+    };
+
+    const user = await UserService.updateUser(id, payload);
+
+    return sendSuccess(res, 'User updated successfully', { user }, 200);
+  } catch (error) {
+    console.error('Update user error:', error);
+    return sendError(res, error.message, null, 400);
+  }
+};
 /**
  * GET /api/users/search
  * Search users by name (returns only id, name, and role)
@@ -94,7 +153,7 @@ const searchUsersByName = async (req, res) => {
     }
 
     const users = await UserService.searchUsersByName(name);
-    
+
     return sendSuccess(res, 'Users retrieved successfully', { users }, 200);
   } catch (error) {
     console.error('Search users error:', error);
@@ -102,10 +161,42 @@ const searchUsersByName = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/users/:id/active
+ * Activate/deactivate a user (Admin only)
+ */
+const setUserActiveStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { active } = req.body;
+
+    if (!req.user || !req.user.isAdmin) {
+      return sendForbidden(res, 'Only admins can change active status');
+    }
+
+    if (typeof active === 'undefined') {
+      return sendError(res, 'Active status is required', null, 400);
+    }
+
+    const user = await UserService.active_deactivateUser(id, Boolean(active));
+    return sendSuccess(res, 'User active status updated', { user }, 200);
+  } catch (error) {
+    console.error('Set active status error:', error);
+    return sendError(res, error.message, null, 400);
+  }
+};
+
+/**
+ * PUT /api/users/:id/profile-pic
+ * Upload user profile picture and save Cloudinary URL
+ */
+
 module.exports = {
   createUser,
   getAllUsers,
   updateUserPassword,
   deleteUser,
-  searchUsersByName
+  searchUsersByName,
+  updateUser,
+  setUserActiveStatus
 };
