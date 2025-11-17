@@ -3,25 +3,16 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { sendSuccess, sendError, sendServerError } = require('../utils/responseHandler');
 
-/**
- * Authentication Service
- * Handles user login and authentication logic
- */
 
-/**
- * Login user with email and password
- */
 const login = async (email, password) => {
   try {
-    // Find user by email (exclude soft deleted)
     const user = await User.findOne({ email: email.toLowerCase() });
-
     if (!user) {
       throw new Error('Invalid email or password');
     }
 
     if (!user.active) {
-      throw new Error('User is inactive. Please contact admin.');
+      throw new Error('User has been deactivated. Please contact admin.');
     }
     console.log(user)
     console.log(password)
