@@ -20,7 +20,7 @@ router.post('/', [
   body('email')
     .isEmail()
     .withMessage('Please provide a valid email'),
-      body('password')
+  body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long'),
   body('role')
@@ -85,7 +85,6 @@ router.put('/:id', [
  * Activate/deactivate user (Admin only)
  */
 router.put('/:id/active', [
-  authMiddleware,
   adminMiddleware,
   param('id').isMongoId().withMessage('Invalid user ID'),
   body('active').isBoolean().withMessage('Active must be a boolean')
@@ -96,7 +95,6 @@ router.put('/:id/active', [
  * Soft delete user (Admin only)
  */
 router.delete('/:id', [
-  authMiddleware,
   adminMiddleware,
   param('id').isMongoId().withMessage('Invalid user ID')
 ], deleteUser);
