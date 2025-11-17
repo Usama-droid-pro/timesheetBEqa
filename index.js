@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
+const { authMiddleware } = require("./middlewares/authMiddleware");
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -50,6 +51,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use(authMiddleware);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasklogs', tasklogRoutes);
