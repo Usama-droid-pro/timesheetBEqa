@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, param, query } = require('express-validator');
-const { createUser, getAllUsers, updateUserPassword, deleteUser, searchUsersByName, updateUser, setUserActiveStatus } = require('../controllers/userController');
+const { createUser, getAllUsers, getUsersForData, updateUserPassword, deleteUser, searchUsersByName, updateUser, setUserActiveStatus, updateUserByAdmin } = require('../controllers/userController');
 const { upload } = require('../middlewares/uploadMiddleware');
 const { authMiddleware, adminMiddleware } = require('../middlewares/authMiddleware');
 
@@ -37,6 +37,17 @@ router.get('/', [
   // authMiddleware,
   // adminMiddleware
 ], getAllUsers);
+
+/**
+ * GET /api/users/for-data
+ * Get users for reporting based on active status and date range
+ */
+router.get('/for-data', [
+  // authMiddleware,
+  // adminMiddleware,
+  query('startDate').optional().isISO8601().withMessage('startDate must be ISO8601 date'),
+  query('endDate').optional().isISO8601().withMessage('endDate must be ISO8601 date')
+], getUsersForData);
 
 /**
  * GET /api/users/search
@@ -79,6 +90,14 @@ router.put('/:id', [
   body('newPassword').optional().isString().isLength({ min: 8 }).withMessage('New password must be at least 8 characters'),
   body('confirmPassword').optional().isString()
 ], updateUser);
+
+router.put('/:id/admin', [
+  adminMiddleware,
+  param('id').isMongoId().withMessage('Invalid user ID'),
+  body('email').optional().isEmail().withMessage('Please provide a valid email'),
+  body('password').optional().isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
+  body('isAdmin').optional().isBoolean().withMessage('isAdmin must be a boolean')
+], updateUserByAdmin);
 
 /**
  * PUT /api/users/:id/active

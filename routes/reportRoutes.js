@@ -16,10 +16,7 @@ router.get('/grand', [
     .withMessage('Invalid endDate format. Use YYYY-MM-DD')
 ], generateGrandReport);
 
-/**
- * GET /api/reports/project-users
- * Generate project + users + tasklogs report for a date range
- */
+
 router.get('/project-users', [
   query('startDate')
     .optional()
