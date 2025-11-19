@@ -34,6 +34,11 @@ const authMiddleware = async (req, res, next) => {
       return sendUnauthorized(res, 'User has been deactivated. Please contact admin.');
     }
 
+
+    if (decoded.tokenVersion !== user.tokenVersion) {
+      return sendUnauthorized(res, 'Session Expired. Please log in again.');
+    }
+
     // Add user info to request object
     req.user = {
       id: user._id,
