@@ -24,7 +24,9 @@ const login = async (email, password) => {
       {
         userId: user._id,
         role: user.role,
-        isAdmin: user?.isAdmin
+        isAdmin: user?.isAdmin,
+        tokenVersion: user?.tokenVersion
+
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
