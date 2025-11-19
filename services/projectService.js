@@ -1,14 +1,6 @@
 const Project = require('../models/Project');
 const { sendSuccess, sendError, sendServerError } = require('../utils/responseHandler');
 
-/**
- * Project Service
- * Handles project-related business logic
- */
-
-/**
- * Create a new project
- */
 const createProject = async (projectData) => {
   try {
     const { name, description, status, members } = projectData;
@@ -53,7 +45,7 @@ const createProject = async (projectData) => {
  */
 const getAllProjects = async () => {
   try {
-    const projects = await Project.find({ isDeleted: false }).populate('members', 'name email role isAdmin profilePic');
+    const projects = await Project.find({ isDeleted: false }).populate('members', 'name email role isAdmin');
 
     return projects.map(project => ({
       id: project._id,
@@ -69,7 +61,7 @@ const getAllProjects = async () => {
           email: m.email,
           role: m.role,
           isAdmin: m.isAdmin,
-          profilePic : m.profilePic
+          profilePic: m.profilePic
         }))
         : [],
       createdAt: project.createdAt,
@@ -113,10 +105,7 @@ const getProjects = async () => {
  */
 const deleteProject = async (projectId) => {
   try {
-    console.log("IN delete project ")
-    console.log(projectId)
     const project = await Project.findById(projectId);
-
 
     if (!project) {
       throw new Error('Project not found');

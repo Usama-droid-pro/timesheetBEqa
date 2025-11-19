@@ -14,23 +14,17 @@ const login = async (email, password) => {
     if (!user.active) {
       throw new Error('User has been deactivated. Please contact admin.');
     }
-    console.log(user)
-    console.log(password)
-    console.log(user.password)
-
     // Check password
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       throw new Error('Invalid email or password');
     }
-
-    // Generate JWT token
     const token = jwt.sign(
       {
         userId: user._id,
         role: user.role,
-        isAdmin : user?.isAdmin
+        isAdmin: user?.isAdmin
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
@@ -60,9 +54,7 @@ const login = async (email, password) => {
   }
 };
 
-/**
- * Get current user data by ID
- */
+
 const getCurrentUser = async (userId) => {
   try {
     const user = await User.findById(userId).select('-password');

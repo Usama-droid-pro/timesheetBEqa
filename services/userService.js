@@ -1,12 +1,10 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
-const { sendSuccess, sendError, sendServerError } = require('../utils/responseHandler');
+const TaskLog = require('../models/TaskLog');
 
 const createUser = async (userData) => {
   try {
     const { name, email, password, role } = userData;
-
-    // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser && !existingUser.isDeleted) {
       throw new Error('User with this email already exists');
@@ -40,7 +38,6 @@ const createUser = async (userData) => {
   }
 };
 
-
 const getAllUsers = async () => {
   try {
     const users = await User.find({ isDeleted: false })
@@ -52,6 +49,7 @@ const getAllUsers = async () => {
       name: user.name,
       email: user.email,
       role: user.role,
+      isAdmin: user.isAdmin,
       createdAt: user.createdAt,
       dob: user.dob,
       gender: user.gender,
@@ -64,18 +62,56 @@ const getAllUsers = async () => {
   }
 };
 
+const getAllUsesForData = async (startDate, endDate) => {
+  try {
+    const allUsers = await User.find({ isDeleted: false })
+      .select('-password')
+      .sort({ createdAt: -1 });
+
+    const activeUsers = allUsers.filter((u) => u.active !== false);
+    const inactiveUsers = allUsers.filter((u) => u.active === false);
+
+    let allowedInactiveIds = [];
+    if (inactiveUsers.length > 0) {
+      const dateFilter = {};
+      if (startDate) dateFilter.$gte = new Date(startDate);
+      if (endDate) dateFilter.$lte = new Date(endDate);
+
+      const query = {
+        userId: { $in: inactiveUsers.map((u) => u._id) },
+        ...(startDate || endDate ? { date: dateFilter } : {}),
+      };
+
+      const distinctIds = await TaskLog.distinct('userId', query);
+      allowedInactiveIds = distinctIds.map((id) => id.toString());
+    }
+
+    const visible = [...activeUsers, ...inactiveUsers.filter((u) => allowedInactiveIds.includes(u._id.toString()))];
+
+    return visible.map((user) => ({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+      dob: user.dob,
+      gender: user.gender,
+      profilePic: user.profilePic,
+      active: user?.active,
+      updatedAt: user.updatedAt,
+    }));
+  } catch (error) {
+    throw error;
+  }
+};
 
 const updateUserPassword = async (userId, newPassword) => {
   try {
     const user = await User.findById(userId);
-
     if (!user || user.isDeleted) {
       throw new Error('User not found');
     }
-
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
     user.password = hashedPassword;
     await user.save();
 
@@ -90,7 +126,6 @@ const updateUserPassword = async (userId, newPassword) => {
     throw error;
   }
 };
-
 
 const deleteUser = async (userId) => {
   try {
@@ -115,7 +150,6 @@ const deleteUser = async (userId) => {
   }
 };
 
-
 const searchUsersByName = async (searchQuery) => {
   try {
     if (!searchQuery || searchQuery.trim().length === 0) {
@@ -128,15 +162,18 @@ const searchUsersByName = async (searchQuery) => {
     const users = await User.find({
       name: { $regex: searchRegex }
     })
-      .select('name role')
+      .select('name role active')
       .sort({ name: 1 })
       .limit(50); // Limit results for performance
 
-    return users.filter(user => user.role !== 'Admin').map(user => ({
-      id: user._id,
-      name: user.name,
-      role: user.role
-    }));
+    return users
+      .filter(user => user.role !== 'Admin' && user.active === true)
+      .map(user => ({
+        id: user._id,
+        name: user.name,
+        role: user.role
+      }));
+
   } catch (error) {
     throw error;
   }
@@ -148,8 +185,6 @@ const updateUser = async (userId, updates) => {
     if (!user || user.isDeleted) {
       throw new Error('User not found');
     }
-
-
     if (Object.prototype.hasOwnProperty.call(updates, 'profilePic')) {
       const profilePic = updates.profilePic;
       if (typeof profilePic === 'string') {
@@ -221,7 +256,6 @@ const updateUser = async (userId, updates) => {
 
     await user.save();
 
-    console.log("user is ", user)
 
     return {
       id: user._id,
@@ -232,6 +266,63 @@ const updateUser = async (userId, updates) => {
       dob: user.dob,
       gender: user.gender,
       profilePic: user.profilePic,
+      updatedAt: user.updatedAt
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const updateUserByAdmin = async (userId, updates) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user || user.isDeleted) {
+      throw new Error('User not found');
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'email')) {
+      const email = updates.email;
+      if (typeof email === 'string' && email.trim() !== '') {
+        const lower = email.trim().toLowerCase();
+        const exists = await User.findOne({ email: lower, _id: { $ne: userId } });
+        if (exists) {
+          throw new Error('User with this email already exists');
+        }
+        user.email = lower;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'isAdmin')) {
+      user.isAdmin = Boolean(updates.isAdmin);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'role')) {
+      const role = updates.role;
+      const allowed = ['QA', 'DESIGN', 'DEV', 'PM', 'Admin'];
+      if (!allowed.includes(role)) {
+        throw new Error('Role must be one of: QA, DESIGN, DEV, PM, Admin');
+      }
+      user.role = role;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'password')) {
+      const password = updates.password;
+      if (typeof password !== 'string' || password.length < 8) {
+        throw new Error('Password must be at least 8 characters long');
+      }
+      const hashed = await bcrypt.hash(password, 10);
+      user.password = hashed;
+    }
+
+    await user.save();
+
+    return {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isAdmin: user.isAdmin,
+      active: user.active,
       updatedAt: user.updatedAt
     };
   } catch (error) {
@@ -263,7 +354,6 @@ const updateUserProfilePic = async (userId, imageUrl) => {
   }
 };
 
-
 const active_deactivateUser = async (userId, activeStatus) => {
   try {
     const user = await User.findById(userId);
@@ -284,13 +374,16 @@ const active_deactivateUser = async (userId, activeStatus) => {
     throw error;
   }
 };
+
 module.exports = {
   createUser,
   getAllUsers,
+  getAllUsesForData,
   updateUserPassword,
   deleteUser,
   searchUsersByName,
   updateUser,
   updateUserProfilePic,
-  active_deactivateUser
+  active_deactivateUser,
+  updateUserByAdmin
 };

@@ -16,10 +16,10 @@ const { sendSuccess, sendError, sendServerError } = require('../utils/responseHa
  */
 const resolveProjectInfo = async (tasks) => {
   const resolvedTasks = [];
-  
+
   for (const task of tasks) {
     const resolvedTask = { ...task };
-    
+
     if (task.project_id && !task.project_name) {
       // Has project_id but no project_name - populate project_name
       const project = await Project.findById(task.project_id);
@@ -33,10 +33,10 @@ const resolveProjectInfo = async (tasks) => {
         resolvedTask.project_id = project._id;
       }
     }
-    
+
     resolvedTasks.push(resolvedTask);
   }
-  
+
   return resolvedTasks;
 };
 
@@ -64,8 +64,8 @@ const createOrUpdateTaskLog = async (taskLogData) => {
     const resolvedTasks = await resolveProjectInfo(tasks);
 
     // Check if task log already exists for this user and date
-    const existingTaskLog = await TaskLog.findOne({ 
-      userId: queryUserId, 
+    const existingTaskLog = await TaskLog.findOne({
+      userId: queryUserId,
       date: new Date(date),
     });
 
@@ -113,14 +113,14 @@ const createOrUpdateTaskLog = async (taskLogData) => {
 const findProjectByFuzzyName = async (oldProjectName) => {
   try {
     const allProjects = await Project.find({});
-    
+
     // Define mapping rules for known project name changes
     const nameMapping = {
       'Picklr': 'Picklr test',
       'CopperField': 'CopperTestField',
       // Add more mappings as needed
     };
-    
+
     // Check direct mapping first
     if (nameMapping[oldProjectName]) {
       const project = allProjects.find(p => p.name === nameMapping[oldProjectName]);
@@ -129,19 +129,19 @@ const findProjectByFuzzyName = async (oldProjectName) => {
         return project;
       }
     }
-    
+
     // Try case-insensitive partial matching
     const lowerOldName = oldProjectName.toLowerCase();
     const partialMatch = allProjects.find(project => {
       const lowerCurrentName = project.name.toLowerCase();
       return lowerCurrentName.includes(lowerOldName) || lowerOldName.includes(lowerCurrentName);
     });
-    
+
     if (partialMatch) {
       console.log(`Fuzzy matched "${oldProjectName}" to "${partialMatch.name}"`);
       return partialMatch;
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error in fuzzy project matching:', error.message);
@@ -149,13 +149,11 @@ const findProjectByFuzzyName = async (oldProjectName) => {
   }
 };
 
-/**
- * Populate project information in task log response
- */
+
 const populateTaskLogProjects = async (taskLog) => {
   try {
     const tasksWithProjects = [];
-    
+
     for (const task of taskLog.tasks) {
       // Handle both Mongoose documents and plain objects safely
       let taskWithProject;
@@ -165,7 +163,7 @@ const populateTaskLogProjects = async (taskLog) => {
         // If toObject fails, just copy the task as-is
         taskWithProject = JSON.parse(JSON.stringify(task));
       }
-      
+
       // If task has project_id, try to get the current project name
       if (taskWithProject.project_id) {
         try {
@@ -183,12 +181,12 @@ const populateTaskLogProjects = async (taskLog) => {
         // If task only has project_name, try to find the project and get current name
         try {
           let project = await Project.findOne({ name: taskWithProject.project_name });
-          
+
           if (!project) {
             // Project name might have changed, try fuzzy matching
             project = await findProjectByFuzzyName(taskWithProject.project_name);
           }
-          
+
           if (project) {
             // Update both project_id and project_name to current values
             taskWithProject.project_id = project._id;
@@ -200,10 +198,10 @@ const populateTaskLogProjects = async (taskLog) => {
           console.error(`Error finding project by name ${taskWithProject.project_name}:`, error.message);
         }
       }
-      
+
       tasksWithProjects.push(taskWithProject);
     }
-    
+
     return {
       id: taskLog._id,
       userId: taskLog.userId,
@@ -235,10 +233,10 @@ const populateTaskLogProjects = async (taskLog) => {
 const getTaskLogs = async (filters) => {
   try {
     const { userId, startDate, endDate, project_name } = filters;
-    
+
     // Build query
     const query = {};
-    
+
     if (userId) {
       console.log('TaskLog Service - Filtering by userId:', userId, 'Type:', typeof userId);
       try {
@@ -250,13 +248,13 @@ const getTaskLogs = async (filters) => {
         query.userId = userId;
       }
     }
-    
+
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
       if (endDate) query.date.$lte = new Date(endDate);
     }
-    
+
     if (project_name) {
       // Search by project name in both project_name field and populated project names
       query['tasks.project_name'] = { $regex: project_name, $options: 'i' };
@@ -277,7 +275,7 @@ const getTaskLogs = async (filters) => {
         }
       });
     });
-    
+
     // Fetch all projects in one query
     const projectsMap = {};
     if (allProjectIds.size > 0) {
@@ -299,7 +297,7 @@ const getTaskLogs = async (filters) => {
           }
           return taskObj;
         });
-        
+
         populatedTaskLogs.push({
           id: taskLog._id,
           userId: taskLog.userId,
@@ -337,7 +335,7 @@ const getTaskLogs = async (filters) => {
 const getSingleTaskLog = async (userId, date) => {
   try {
     console.log('getSingleTaskLog - userId:', userId, 'date:', date);
-    
+
     let queryUserId;
     try {
       // Convert string userId to ObjectId for proper MongoDB querying
@@ -346,9 +344,9 @@ const getSingleTaskLog = async (userId, date) => {
       console.error('Invalid userId format in getSingleTaskLog:', userId, error.message);
       queryUserId = userId;
     }
-    
-    const taskLog = await TaskLog.findOne({ 
-      userId: queryUserId, 
+
+    const taskLog = await TaskLog.findOne({
+      userId: queryUserId,
       date: new Date(date),
     }).populate('userId', 'name email role');
 
@@ -396,7 +394,7 @@ const updateTaskLogById = async (taskLogId, updateData) => {
       throw new Error('Task log not found');
     }
 
-   
+
     // Update fields if provided
     if (totalHours !== undefined) {
       taskLog.totalHours = totalHours;
@@ -431,12 +429,12 @@ const deleteTaskLogById = async (taskLogId) => {
 
     const deleteTask = await TaskLog.findByIdAndDelete(taskLogId);
 
-  
+
     return ({
-      message : "Task log deleted successfully",
-      data : deleteTask,
-      success : true,
-      status : 200,
+      message: "Task log deleted successfully",
+      data: deleteTask,
+      success: true,
+      status: 200,
     })
   } catch (error) {
     throw error;
