@@ -294,6 +294,7 @@ const updateUserByAdmin = async (userId, updates) => {
 
     if (Object.prototype.hasOwnProperty.call(updates, 'isAdmin')) {
       user.isAdmin = Boolean(updates.isAdmin);
+      user.tokenVersion += 1;
     }
 
     if (Object.prototype.hasOwnProperty.call(updates, 'role')) {
