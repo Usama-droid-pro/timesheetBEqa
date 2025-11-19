@@ -41,6 +41,23 @@ const getAllUsers = async (req, res) => {
 };
 
 /**
+ * GET /api/users/for-data
+ * Get users filtered by active status and date range
+ * - Active users are always returned
+ * - Inactive users are returned only if they have task logs within the range
+ */
+const getUsersForData = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const users = await UserService.getAllUsesForData(startDate, endDate);
+    return sendSuccess(res, 'Users for data range retrieved successfully', { users }, 200);
+  } catch (error) {
+    console.error('Get users for data range error:', error);
+    return sendServerError(res, 'Failed to retrieve users for data range', error.message);
+  }
+};
+
+/**
  * PUT /api/users/:id/password
  * Update user password (Admin only)
  */
@@ -64,10 +81,6 @@ const updateUserPassword = async (req, res) => {
   }
 };
 
-/**
- * DELETE /api/users/:id
- * Soft delete user (Admin only)
- */
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -81,11 +94,6 @@ const deleteUser = async (req, res) => {
   }
 };
 
-/**
- * PUT /api/users/:id
- * Update user fields: phone, dob, gender
- * Optionally update password when currentPassword, newPassword, confirmPassword are provided
- */
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -140,10 +148,34 @@ const updateUser = async (req, res) => {
     return sendError(res, error.message, null, 400);
   }
 };
-/**
- * GET /api/users/search
- * Search users by name (returns only id, name, and role)
- */
+
+const updateUserByAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user || !req.user.isAdmin) {
+      return sendForbidden(res, 'Only admins can update user data');
+    }
+
+    const { email, password, isAdmin } = req.body;
+
+    const payload = {
+      ...(typeof email !== 'undefined' ? { email } : {}),
+      ...(typeof password !== 'undefined' ? { password } : {}),
+      ...(typeof isAdmin !== 'undefined' ? { isAdmin } : {}),
+    };
+
+    const user = await UserService.updateUserByAdmin(id, payload);
+
+    return sendSuccess(res, 'User updated successfully', { user }, 200);
+  } catch (error) {
+    console.error('Admin update user error:', error);
+    return sendError(res, error.message, null, 400);
+  }
+};
+
+
+
 const searchUsersByName = async (req, res) => {
   try {
     console.log("IN search by name ")
@@ -194,9 +226,11 @@ const setUserActiveStatus = async (req, res) => {
 module.exports = {
   createUser,
   getAllUsers,
+  getUsersForData,
   updateUserPassword,
   deleteUser,
   searchUsersByName,
   updateUser,
-  setUserActiveStatus
+  setUserActiveStatus,
+  updateUserByAdmin
 };
